@@ -1,145 +1,177 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Space Shooter</title>
+<title>Galaxy Shooter PRO</title>
 <style>
-body{margin:0;overflow:hidden;background:black;color:white;font-family:Arial;text-align:center}
-canvas{display:none;margin:auto;background:black}
-#menu{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
-button{padding:12px 25px;font-size:18px;margin:10px;border-radius:10px}
+body {
+  margin: 0;
+  overflow: hidden;
+  background: black;
+}
+canvas {
+  display: block;
+}
+#menu {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: black;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+button {
+  padding: 15px 30px;
+  font-size: 20px;
+  margin-top: 10px;
+}
 </style>
 </head>
+
 <body>
+
 <div id="menu">
-<h1>🚀Space Shooter</h1>
-<button onclick="startGame()">Start Game</button>
+  <h1>🚀 GALAXY SHOOTER</h1>
+  <button onclick="startGame()">Start Game</button>
 </div>
+
 <canvas id="gameCanvas"></canvas>
-<audio id="bgm" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"></audio>
 
 <script>
-const canvas=document.getElementById("gameCanvas");
-const ctx=canvas.getContext("2d");
-canvas.width=window.innerWidth;
-canvas.height=window.innerHeight;
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
-// Images
-let playerImg=new Image(); playerImg.src="https://i.imgur.com/6X12F5C.png";
-let enemyImg=new Image(); enemyImg.src="https://i.imgur.com/Z6X7KZL.png";
-let explosionImg=new Image(); explosionImg.src="https://i.imgur.com/OdL0XPt.png";
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-let player,bullets,enemies,explosions,score,level;
-let gameRunning=false,paused=false;
+let gameRunning = false;
+let bullets = [];
+let enemies = [];
+let boss = null;
+let score = 0;
+
+let player = {
+  x: canvas.width/2,
+  y: canvas.height - 100,
+  w: 60,
+  h: 60,
+  speed: 7,
+  hp: 100
+};
 
 function startGame(){
- document.getElementById("menu").style.display="none";
- canvas.style.display="block";
- document.getElementById("bgm").play();
-
- player={x:canvas.width/2,y:canvas.height-100,size:60,speed:8,health:100};
- bullets=[];enemies=[];explosions=[];
- score=0;level=1;gameRunning=true;
- loop();
+  document.getElementById("menu").style.display = "none";
+  gameRunning = true;
+  gameLoop();
 }
 
-let keys={};
-document.addEventListener("keydown",e=>{
- keys[e.key]=true;
- if(e.key==='p') paused=!paused;
+document.addEventListener("mousemove", e => {
+  player.x = e.clientX;
 });
-document.addEventListener("keyup",e=>keys[e.key]=false);
 
-// Shooting types
-let shootMode="normal";
-setInterval(()=>{
- if(gameRunning&&!paused){
-  if(shootMode==="normal") bullets.push({x:player.x+25,y:player.y});
-  if(shootMode==="triple"){
-    bullets.push({x:player.x+25,y:player.y});
-    bullets.push({x:player.x,y:player.y});
-    bullets.push({x:player.x+50,y:player.y});
+document.addEventListener("click", () => {
+  bullets.push({x: player.x, y: player.y});
+});
+
+function spawnEnemies(){
+  if(Math.random() < 0.03){
+    enemies.push({
+      x: Math.random()*canvas.width,
+      y: -20,
+      type: Math.random() > 0.5 ? "fast" : "normal"
+    });
   }
- }
-},200);
+}
 
-// Enemies
-setInterval(()=>{
- if(gameRunning&&!paused){
-  enemies.push({x:Math.random()*canvas.width,y:-50,size:50,speed:2+level});
- }
-},800);
+function spawnBoss(){
+  if(score > 50 && !boss){
+    boss = {
+      x: canvas.width/2,
+      y: 100,
+      hp: 200,
+      attackTimer: 0
+    };
+  }
+}
 
-// Power system
-setInterval(()=>{
- if(score>10) shootMode="triple";
- if(score>30) level=2;
- if(score>60) level=3;
-},1000);
+function drawPlayer(){
+  ctx.fillStyle = "cyan";
+  ctx.fillRect(player.x-30, player.y-30, player.w, player.h);
+}
 
-function update(){
- if(!gameRunning||paused) return;
+function drawBullets(){
+  ctx.fillStyle = "yellow";
+  bullets.forEach(b => {
+    b.y -= 10;
+    ctx.fillRect(b.x, b.y, 5, 15);
+  });
+}
 
- if(keys["ArrowLeft"]) player.x-=player.speed;
- if(keys["ArrowRight"]) player.x+=player.speed;
+function drawEnemies(){
+  enemies.forEach((e,i)=>{
+    e.y += e.type==="fast"?5:2;
+    ctx.fillStyle = e.type==="fast"?"red":"green";
+    ctx.fillRect(e.x, e.y, 40, 40);
 
- bullets.forEach((b,i)=>{b.y-=12;if(b.y<0) bullets.splice(i,1)});
+    bullets.forEach((b,j)=>{
+      if(b.x < e.x+40 && b.x > e.x && b.y < e.y+40){
+        enemies.splice(i,1);
+        bullets.splice(j,1);
+        score++;
+      }
+    });
+  });
+}
 
- enemies.forEach((e,ei)=>{
-  e.y+=e.speed;
+function drawBoss(){
+  if(!boss) return;
 
-  // smarter AI zigzag
-  e.x+=Math.sin(e.y/20)*3;
+  ctx.fillStyle = "purple";
+  ctx.fillRect(boss.x-80, boss.y-50, 160, 100);
 
-  if(Math.abs(e.x-player.x)<40&&Math.abs(e.y-player.y)<40){
-    gameOver();
+  boss.attackTimer++;
+  if(boss.attackTimer % 20 === 0){
+    enemies.push({x: boss.x, y: boss.y, type:"fast"});
   }
 
-  bullets.forEach((b,bi)=>{
-    if(Math.abs(e.x-b.x)<30&&Math.abs(e.y-b.y)<30){
-      explosions.push({x:e.x,y:e.y,time:10});
-      enemies.splice(ei,1);
-      bullets.splice(bi,1);
-      score++;
+  bullets.forEach((b,i)=>{
+    if(b.x > boss.x-80 && b.x < boss.x+80 && b.y < boss.y+50){
+      boss.hp -= 2;
+      bullets.splice(i,1);
     }
   });
- });
 
- explosions.forEach((ex,i)=>{
-  ex.time--;
-  if(ex.time<=0) explosions.splice(i,1);
- });
+  if(boss.hp <= 0){
+    boss = null;
+    score += 50;
+  }
 }
 
-function draw(){
- ctx.clearRect(0,0,canvas.width,canvas.height);
-
- ctx.drawImage(playerImg,player.x,player.y,60,60);
- bullets.forEach(b=>ctx.fillRect(b.x,b.y,5,12));
- enemies.forEach(e=>ctx.drawImage(enemyImg,e.x,e.y,50,50));
-
- explosions.forEach(ex=>{
-  ctx.drawImage(explosionImg,ex.x,ex.y,50,50);
- });
-
- ctx.fillStyle="white";
- ctx.fillText("Score: "+score,20,30);
- ctx.fillText("Level: "+level,20,60);
-
- if(paused){
-  ctx.font="40px Arial";
-  ctx.fillText("PAUSED",canvas.width/2-80,canvas.height/2);
- }
+function drawUI(){
+  ctx.fillStyle="white";
+  ctx.fillText("Score: "+score, 20, 30);
+  ctx.fillText("HP: "+player.hp, 20, 60);
 }
 
-function loop(){ update(); draw(); if(gameRunning) requestAnimationFrame(loop); }
+function gameLoop(){
+  if(!gameRunning) return;
 
-function gameOver(){
- gameRunning=false;
- document.getElementById("bgm").pause();
- document.body.innerHTML=`<h1>💀 Game Over</h1><h2>Score: ${score}</h2><h3>Level: ${level}</h3><button onclick="location.reload()">Restart</button>`;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  spawnEnemies();
+  spawnBoss();
+
+  drawPlayer();
+  drawBullets();
+  drawEnemies();
+  drawBoss();
+  drawUI();
+
+  requestAnimationFrame(gameLoop);
 }
 </script>
+
 </body>
 </html>
