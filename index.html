@@ -1,31 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Galaxy Shooter PRO</title>
+<title>Galaxy Shooter Level 2</title>
 <style>
-body {
-  margin: 0;
-  overflow: hidden;
-  background: black;
-}
-canvas {
-  display: block;
-}
+body { margin:0; overflow:hidden; background:black; }
+canvas { display:block; }
 #menu {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background: black;
-  color: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
+  position:absolute;
+  width:100%;
+  height:100%;
+  background:black;
+  color:white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
 }
 button {
-  padding: 15px 30px;
-  font-size: 20px;
-  margin-top: 10px;
+  padding:15px 30px;
+  font-size:20px;
 }
 </style>
 </head>
@@ -49,16 +42,28 @@ canvas.height = window.innerHeight;
 let gameRunning = false;
 let bullets = [];
 let enemies = [];
-let boss = null;
+let explosions = [];
 let score = 0;
 
+let bgY = 0;
+
+// 🟢 LOAD IMAGES
+const playerImg = new Image();
+playerImg.src = "https://i.imgur.com/6X12FQp.png";
+
+const enemyImg = new Image();
+enemyImg.src = "https://i.imgur.com/Z6X8KZy.png";
+
+const bgImg = new Image();
+bgImg.src = "https://i.imgur.com/3e5pRZC.jpg";
+
+// PLAYER
 let player = {
   x: canvas.width/2,
-  y: canvas.height - 100,
-  w: 60,
-  h: 60,
-  speed: 7,
-  hp: 100
+  y: canvas.height-120,
+  w: 70,
+  h: 70,
+  speed: 7
 };
 
 function startGame(){
@@ -67,106 +72,114 @@ function startGame(){
   gameLoop();
 }
 
-document.addEventListener("mousemove", e => {
+// 🎮 CONTROLS
+document.addEventListener("mousemove", e=>{
   player.x = e.clientX;
 });
 
-document.addEventListener("click", () => {
-  bullets.push({x: player.x, y: player.y});
+document.addEventListener("click", ()=>{
+  bullets.push({x:player.x, y:player.y});
 });
 
+// 🟣 SPAWN ENEMIES
 function spawnEnemies(){
   if(Math.random() < 0.03){
     enemies.push({
       x: Math.random()*canvas.width,
-      y: -20,
-      type: Math.random() > 0.5 ? "fast" : "normal"
+      y: -50,
+      speed: Math.random()*3+2
     });
   }
 }
 
-function spawnBoss(){
-  if(score > 50 && !boss){
-    boss = {
-      x: canvas.width/2,
-      y: 100,
-      hp: 200,
-      attackTimer: 0
-    };
-  }
+// 🔴 DRAW BACKGROUND
+function drawBackground(){
+  bgY += 2;
+  if(bgY > canvas.height) bgY = 0;
+
+  ctx.drawImage(bgImg, 0, bgY - canvas.height, canvas.width, canvas.height);
+  ctx.drawImage(bgImg, 0, bgY, canvas.width, canvas.height);
 }
 
+// 🟢 DRAW PLAYER
 function drawPlayer(){
-  ctx.fillStyle = "cyan";
-  ctx.fillRect(player.x-30, player.y-30, player.w, player.h);
+  ctx.drawImage(playerImg, player.x-35, player.y-35, player.w, player.h);
 }
 
+// 🔵 BULLETS
 function drawBullets(){
-  ctx.fillStyle = "yellow";
-  bullets.forEach(b => {
-    b.y -= 10;
-    ctx.fillRect(b.x, b.y, 5, 15);
+  bullets.forEach((b,i)=>{
+    b.y -= 12;
+
+    // glow effect
+    ctx.fillStyle = "cyan";
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 5, 0, Math.PI*2);
+    ctx.fill();
+
+    if(b.y < 0) bullets.splice(i,1);
   });
 }
 
+// 🔴 ENEMIES
 function drawEnemies(){
   enemies.forEach((e,i)=>{
-    e.y += e.type==="fast"?5:2;
-    ctx.fillStyle = e.type==="fast"?"red":"green";
-    ctx.fillRect(e.x, e.y, 40, 40);
+    e.y += e.speed;
 
+    ctx.drawImage(enemyImg, e.x-25, e.y-25, 50, 50);
+
+    // collision
     bullets.forEach((b,j)=>{
-      if(b.x < e.x+40 && b.x > e.x && b.y < e.y+40){
+      if(b.x < e.x+25 && b.x > e.x-25 && b.y < e.y+25 && b.y > e.y-25){
         enemies.splice(i,1);
         bullets.splice(j,1);
+
+        explosions.push({x:e.x, y:e.y, size:0});
         score++;
       }
     });
-  });
-}
 
-function drawBoss(){
-  if(!boss) return;
-
-  ctx.fillStyle = "purple";
-  ctx.fillRect(boss.x-80, boss.y-50, 160, 100);
-
-  boss.attackTimer++;
-  if(boss.attackTimer % 20 === 0){
-    enemies.push({x: boss.x, y: boss.y, type:"fast"});
-  }
-
-  bullets.forEach((b,i)=>{
-    if(b.x > boss.x-80 && b.x < boss.x+80 && b.y < boss.y+50){
-      boss.hp -= 2;
-      bullets.splice(i,1);
+    if(e.y > canvas.height){
+      enemies.splice(i,1);
     }
   });
-
-  if(boss.hp <= 0){
-    boss = null;
-    score += 50;
-  }
 }
 
+// 💥 EXPLOSION EFFECT
+function drawExplosions(){
+  explosions.forEach((ex,i)=>{
+    ex.size += 2;
+
+    ctx.strokeStyle = "orange";
+    ctx.beginPath();
+    ctx.arc(ex.x, ex.y, ex.size, 0, Math.PI*2);
+    ctx.stroke();
+
+    if(ex.size > 30){
+      explosions.splice(i,1);
+    }
+  });
+}
+
+// 🧠 UI
 function drawUI(){
-  ctx.fillStyle="white";
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
   ctx.fillText("Score: "+score, 20, 30);
-  ctx.fillText("HP: "+player.hp, 20, 60);
 }
 
+// 🔁 GAME LOOP
 function gameLoop(){
   if(!gameRunning) return;
 
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
+  drawBackground();
   spawnEnemies();
-  spawnBoss();
-
   drawPlayer();
   drawBullets();
   drawEnemies();
-  drawBoss();
+  drawExplosions();
   drawUI();
 
   requestAnimationFrame(gameLoop);
